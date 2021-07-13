@@ -6,7 +6,7 @@
     - [Global services and regional services](#global-services-and-regional-services)
       - [Global services](#global-services)
       - [Regional service examples](#regional-service-examples)
-  - [Identity and Access Management (IAM)](#identity-and-access-management-iam)
+  - [IAM Identity and Access Management](#iam-identity-and-access-management)
     - [Basic facts and best practices](#basic-facts-and-best-practices)
     - [IAM policies](#iam-policies)
     - [IAM password policies](#iam-password-policies)
@@ -42,7 +42,75 @@
       - [Elastic Network Interfaces](#elastic-network-interfaces)
     - [EC2 status (hibernation)](#ec2-status-hibernation)
     - [EC2 Nitro](#ec2-nitro)
+  - [Load Balancing and Auto-scaling](#load-balancing-and-auto-scaling)
+    - [Scalability & high availability (HA) concepts](#scalability--high-availability-ha-concepts)
+    - [Load balancers (LB)](#load-balancers-lb)
+      - [Facts and knowledge](#facts-and-knowledge)
+      - [Health checks](#health-checks)
+      - [Elastic load balancer (ELB) categories:](#elastic-load-balancer-elb-categories)
+      - [Stickiness](#stickiness)
+      - [Cross-Zone Load Balancing](#cross-zone-load-balancing)
+      - [Security groups](#security-groups-1)
+      - [SSL & Certificates](#ssl--certificates)
+        - [Server Name Indication (SNI)](#server-name-indication-sni)
+      - [Connection Draining (CLB) or Deregistration Delay (ALB & NLB)](#connection-draining-clb-or-deregistration-delay-alb--nlb)
+    - [Auto Scaling Groups (ASG)](#auto-scaling-groups-asg)
+      - [ASG Motivation:](#asg-motivation)
+      - [ASG attributies](#asg-attributies)
+      - [Auto scaling alarms](#auto-scaling-alarms)
+      - [Launch configuration & launch template](#launch-configuration--launch-template)
+      - [ASG scaling policies](#asg-scaling-policies)
+        - [Termination policy](#termination-policy)
+        - [ASG lifecycle hooks](#asg-lifecycle-hooks)
+  - [Storage](#storage)
+    - [RDS (Relational Database Service)](#rds-relational-database-service)
+      - [Overview](#overview)
+      - [RDS Backups](#rds-backups)
+      - [Storage Auto Scaling](#storage-auto-scaling)
+      - [RDS read replicas](#rds-read-replicas)
+      - [RDS multiple AZ (disaster recovery)](#rds-multiple-az-disaster-recovery)
+      - [RDS security](#rds-security)
+        - [Encryption](#encryption)
+        - [Network & IAM](#network--iam)
+      - [Aurora](#aurora)
+        - [overview](#overview-1)
+        - [HA & Read Scaling](#ha--read-scaling)
+        - [Aurora security](#aurora-security)
+        - [Aurora serverless](#aurora-serverless)
+        - [Aurora Global Database](#aurora-global-database)
+        - [Aurora machine learning](#aurora-machine-learning)
+    - [ElasticCache](#elasticcache)
+      - [Overview](#overview-2)
+      - [Redis vs Memcached](#redis-vs-memcached)
+      - [Use cases](#use-cases)
+        - [DB Cache](#db-cache)
+        - [User session store](#user-session-store)
+      - [Cache Security](#cache-security)
+      - [ElasticCache Patterns](#elasticcache-patterns)
+  - [Network](#network)
+    - [Route 53](#route-53)
+      - [Overview](#overview-3)
+      - [Route 53 as a domain registrar](#route-53-as-a-domain-registrar)
+      - [Route 53 advanced features](#route-53-advanced-features)
+      - [CNAME and Alias](#cname-and-alias)
+      - [Routing Policies](#routing-policies)
+        - [Simple routing policy](#simple-routing-policy)
+        - [Weighted routing policy](#weighted-routing-policy)
+        - [Latency routing policy](#latency-routing-policy)
+        - [Geo location routing policy](#geo-location-routing-policy)
+        - [Geoproximity Routing Policy](#geoproximity-routing-policy)
+        - [Multi-value routing policy](#multi-value-routing-policy)
+      - [Health Checks](#health-checks-1)
 - [Tables and Quick Reference](#tables-and-quick-reference)
+- [Solutions Architecture Examples](#solutions-architecture-examples)
+  - [Classic Solution Architecture](#classic-solution-architecture)
+    - [Whatisthetime.com](#whatisthetimecom)
+      - [Step by step incremental improvement](#step-by-step-incremental-improvement)
+    - [MyClothes.com](#myclothescom)
+      - [Step by step incremental improvement](#step-by-step-incremental-improvement-1)
+    - [Mywordpress.com](#mywordpresscom)
+      - [Step by step incremental improvement](#step-by-step-incremental-improvement-2)
+    - [Instantiating App quickly](#instantiating-app-quickly)
 
 # Notes
 
@@ -76,7 +144,7 @@ Each region usually have 3 AZs, but some regions have only 2 AZs. The maximal nu
 2. Elastic Beanstalk
 3. Lambda
 
-## Identity and Access Management (IAM)
+## IAM Identity and Access Management
 
 ### Basic facts and best practices
 
@@ -318,11 +386,11 @@ Common options:
 
 ##### Comparison of EBS and EFS
 
-|            | EBS                                                             | EFS |
-| ---------- | --------------------------------------------------------------- | --- |
-| Attachment | **One** instance at a time, io support multi-attachement in same AZ |  Support  |
-| Migration  | take snapshot 
-
+| Type      | EBS                                                                 | EFS                    |
+| --------- | ------------------------------------------------------------------- | ---------------------- |
+| Mount     | **One** instance at a time, io support multi-attachement in same AZ | Support 100s instances |
+| Migration | take snapshot and restore snapshot in another AZ                    | No need                |
+| OS        | Flexible                                                            | Linux Only             |
 
 
 
@@ -390,4 +458,550 @@ Next generation virtualization for EC2 instances.
 
 Higher speed EBS (64,000 EBS IOPS, currentmax 32,000 for non-Nitro instances)
 
+
+## Load Balancing and Auto-scaling
+
+### Scalability & high availability (HA) concepts
+
+Scalability means application can handle greater loads by adapting.
+
+1. vertical scalability
+2. horizontal scalability
+
+HA means running your application / system in at least 2 data centers (AZs).
+
+### Load balancers (LB)
+
+Load balancers are servers that forward internet traffic to multiple servers (EC2 Instances) downstream.
+
+Advantanges of using a load balancer:
+
+1. Spread load across multiple downstream instances
+2. Expose a **single point of access (DNS)** to your application • Seamlessly handle failures of downstream instances
+3. Do regular health checks to your instances
+4. Provide SSL termination (HTTPS) for your websites
+5. **Enforce stickiness with cookies**
+6. High availability across zones
+7. Separate public traffic from private traffic
+
+#### Facts and knowledge
+
+1. **4xx** errors are client induced errors 
+2. **5xx** errors are server errors.
+3. Load Balancer Errors **503** means at capacity or no registered target
+
+
+#### Health checks
+
+Enables LB to know status of instances
+
+#### Elastic load balancer (ELB) categories:
+
+1. Classic LB
+   1. TCP (layer 4), HTTP, HTTPS
+   2. Fixed hostname: xxx.region.elb.amazonaws.com
+2. Application LB
+   1. Fixed hostname: xxx.region.elb.amazonaws.com
+   2. HTTP/HTTPS, WebSockets (layer 7)
+   3. can redirect to containers on the same instance
+   4. support port mapping feature
+   5. redirect rules
+      1. based on path in URL
+      2. based on hostname in URL
+      3. based on querystring, headers (content)
+   6. target groups
+      1. EC2 instances
+      2. ECS tasks (containers)
+      3. Lambda functions
+      4. Private IP addresses
+   7. application server doesn't see IP of clients, which is stored in **X-Forwarded-For** header.
+3. Network LB
+   1. forward TCP & UDP traffic to instance
+   2. less latency ~ 100ms 
+   3. has **one static IP per AZ**. (helpful for whitelisting specific IP)
+   4. no free tier
+4. Gateway LB (not discussed here)
+
+#### Stickiness
+
+1. The same client is always redirected to the same instance behind an LB
+2. Could potentially introduce imbalance of load
+
+#### Cross-Zone Load Balancing
+
+Each load balance instance distributes **evenly across all registered instances in all AZ**
+
+1. ALB (always on, free)
+2. NLB (disabled by default, not free)
+3. CLB
+   1. from console (enabled by default)
+   2. from CLI/API (disabled by default)
+   3. free
+
+#### Security groups
+
+It is good practice to let application **only** receives traffic from the load balancer.
+
+#### SSL & Certificates
+
+An SSL Certificate allows traffic between your clients and your load balancer to be encrypted in transit (in-flight encryption).
+
+SSL with LB
+
+1. CLB
+   1. one SSL certificate only
+   2. needs multiple CLB to support multiple hostnames with multiple SSL certificates
+2. ALB & NLB
+   1. multiple SSL certificates with SNI
+
+
+##### Server Name Indication (SNI)
+
+SNI solves the problem of loading **multiple SSL certificates onto one web server** (to serve multiple websites)
+
+1. Only works for ALB, NLB and CloudFront.
+2. Not for CLB.
+
+#### Connection Draining (CLB) or Deregistration Delay (ALB & NLB)
+
+Time to complete “in-flight requests” while the instance is de-registering or unhealthy.
+
+Allow the in-flight requests to complete. Can be disabled. If the requests are shorter, then set shorter delay time.
+
+### Auto Scaling Groups (ASG)
+
+#### ASG Motivation:
+
+1. Scale out (add EC2 instances) to match an increased load
+2. Scale in (remove EC2 instances) to match a decreased load
+3. Ensure we have a minimum and a maximum number of machines running
+4. Automatically Register new instances to a load balancer
+
+#### ASG attributies
+
+ASG has the following attributes
+
+1. Launch **configuration**:
+   1. AMI + instance type
+   2. EC2 user data
+   3. EBS volumes
+   4. **security groups**
+   5. SSH key pairs
+2. Min/Max/Initial capacity information
+3. Network + subnet
+4. Scaling policies
+5. LB information
+
+Capacity information:
+
+![ASG](https://miro.medium.com/max/487/1*uS9J8btKCQaMOhnUXp62aA.jpeg)
+
+#### Auto scaling alarms
+
+Alarms can be
+
+1. based on cloudwatch alarms and directly managed by EC2,
+2. based on customized metrics
+
+Example:
+
+1. average CPU usage
+2. number of requests on the ELB per instance
+3. average network in
+4. average network out
+
+#### Launch configuration & launch template
+
+1. configuration can't be modified, must be recreated every time.
+2. launch template are recommended
+   1. versioned.
+   2. can be reused and inherited.
+   3. provisioned using on-demand or spot instances
+   4. use T2 unlimited burst feature.
+
+#### ASG scaling policies
+
+1. target tracking scaling: average CPU usage **be** around 40%
+2. simple step scaling
+3. scheduled action
+
+Scaling cooldowns makes sure that one action finishes before another one is triggered. 
+
+##### Termination policy
+
+Default termination policy balances the number of instances across AZ.
+
+1. Terminate instance in the AZ with the most instances
+2. Terminate instance with the oldest launch configuration
+
+##### ASG lifecycle hooks
+
+1. Pending state
+2. Terminating state
+
+
+## Storage
+
+### RDS (Relational Database Service)
+
+Managed DB service for DB use SQL as a query language.
+
+#### Overview
+
+Flavors of RDS
+
+1. Postgres
+2. MySQL
+3. MariaDB
+4. Oracle
+5. Microsoft SQL Server
+6. Aurora
+
+Advantages:
+
+1. Automated provisioning, OS patching
+2. Continuous backups and restore to specific timestamp (Point in Time Restore)
+3. Monitoring dashboards
+4. **Read replicas** for improved read performance
+5. Multi AZ setup for DR (Disaster Recovery)
+6. Maintenance windows for upgrades
+7. Scaling capability (vertical and horizontal) 
+8. Storage backed by EBS (gp2 or io1)
+
+But you **can't SSH** to the RDS instance.
+
+#### RDS Backups
+
+Automatic backups:
+
+1. daily full backup
+2. transaction logs backup every 5 minutes
+3. 7 day default retention
+
+#### Storage Auto Scaling
+
+Set **Maximum storage threshold**. Storage automatically scales when certain rules are triggered.
+
+Useful for **unpredictable workloads**.
+
+#### RDS read replicas
+
+1. up to 5 read replicas
+2. across AZ or region
+3. **ASYNC** so reads are eventually consistent
+4. applications must update connection string to read from read replicas.
+
+Use cases: replica for reporting analysis.
+
+Cost: in-region is free, cross region needs payment.
+
+#### RDS multiple AZ (disaster recovery)
+
+1. replication is **SYNC**
+2. One DNS name (no additional connection strings), automatical failover
+3. increase availability
+4. Free
+5. **Not used for scaling** but for stand-by instance
+
+#### RDS security 
+
+##### Encryption
+
+At rest: 
+
+1. If master is not encrypted, the read replica can't be encrypted.
+2. encrypted at launch time
+3. Transparent Data Encryption available for **Oracle and SQL server**
+
+In-flight encryption
+
+1. SSL certificates available
+
+un-encrypted RDS database can be encrypted by encrypting the un-encrypted snapshot
+
+##### Network & IAM
+
+Network security:
+
+1. Usually deployed in private subnet
+2. Leveraging security groups
+
+Access Management
+
+1. Controls who can manage AWS RDS
+2. username/password can loginto database
+3. IAM-based authentication can be used to log into **RDS MySQL & Postgres**
+
+#### Aurora
+
+##### overview
+
+1. Proprietary
+2. Up to 64TB
+3. up to 15 replicas 
+4. HA native
+5. more expensive
+6. support multiple-master
+
+##### HA & Read Scaling
+
+1. Support cross region replication
+2. automatic read replica scaling
+3. self healing with peer-to-peer replication
+4. automated failover for master in less than 30 seconds
+5. Up to 15 read replicas to serve reads
+6. Support custom endpoints for specific queries
+
+##### Aurora security
+
+Possibility to authenticate using IAM token
+
+##### Aurora serverless
+
+pay per seconds
+good for infrequent or unpredictable workloads
+
+##### Aurora Global Database
+
+1. 1 Primary Region for read/write
+2. Up to **5** read-only secondary regions, replication lag < 1s.
+3. Up to 16 read replicas per secodnary region.
+4. RTO < 1 minute for disaster recovery
+
+##### Aurora machine learning
+
+Simple, optimized and secure integration between Aurora and AWS machine learning services.
+
+1. Amazon SageMaker
+2. Amazon Comprehend
+
+
+### ElasticCache
+
+#### Overview
+
+1. managed Redis or Memcached services
+2. make application stateless
+3. may involve heavy application code changes
+
+#### Redis vs Memcached
+
+|                    | Redis                              | Memcached                           |
+| ------------------ | ---------------------------------- | ----------------------------------- |
+| Failover           | Multi-AZ with Auto-failover        | Multi-node for partitioning of data |
+| High availability  | Yes with read replicas             | No                                  |
+| Data durability    | AOF (append-only file) persistence | No                                  |
+| Backup and restore | Yes                                | No                                  |
+|                    |                                    | multi-threading architecture        |
+
+
+#### Use cases
+
+##### DB Cache
+
+1. reduce load off of databases
+2. must have an invalidation strategy
+
+Gaming leaderboard example: **Redis Sorted Sets** allow unique and real-time element ranking
+
+##### User session store
+
+User logs into any of application
+application writes session data to ElasticCache
+User hits another instance and session data in ElasticCache ensure that user is logged-in.
+
+#### Cache Security
+
+1. **No IAM authentication**
+2. **Redis AUTH** available 
+3. Memcached support sasl-based authentication
+
+#### ElasticCache Patterns
+
+1. Lazy Loading: all read data is cached
+2. Write through: adds or update data in the cache when updated to a db
+3. Session store: store temporary session data in cache
+
+
+## Network
+
+### Route 53
+
+#### Overview
+
+Route 53 is a managed DNS service that provides dynamic DNS resolution.
+
+$0.5 per hosted zone (hostname suffix)
+
+Route 53 resolves the "records" in the DNS zone to the correct IP address.
+
+IN AWS, the most common records are:
+
+1. A: hostname to IPv4
+2. AAAA: hostname to IPv6
+3. CNAME: hostname to hostname
+4. Alias: hostname to AWS resources
+
+The domain names can be:
+
+1. public domain names one owns
+2. private domain names that can be resolved by your instance in your VPCs.
+
+#### Route 53 as a domain registrar
+
+You can buy domain on Route 53
+
+If you buy domain on 3rd party website
+
+1. create a hostzone in route 53
+2. update NS record on 3rd party website to use Route 53 name servers.
+
+
+Every DNS record will have a TTL (time to live)
+
+1. longer TTL: less traffic to DNS server but may be outdated
+2. shorter TTL: more traffic to DNS server but easy to update DNS
+
+#### Route 53 advanced features
+
+1. load balancing
+2. heath check
+3. routing policies: simple, failover, geolocation, latency, etc.
+
+#### CNAME and Alias
+
+AWS resources expose AWS hostnames.
+
+Alias is free and comes with native health check.
+
+|          | CNAME                | Alias                           |
+| -------- | -------------------- | ------------------------------- |
+| pointing | hostname to hostname | hostname to an aws resource     |
+| scope    | non-root domain      | root domain and non-root domain |
+
+#### Routing Policies
+
+##### Simple routing policy
+
+Map a hostname to another hostname. Can't assign health check. If multiple records return, a random one will be chosen by the **client**.
+
+
+##### Weighted routing policy
+
+Control the weight of the requests that go to specific endpoint. 
+
+1. Helpful to test new versions like A/B testing
+2. Helpful to split traffic betweeen regions.
+3. Can attach health check.
+
+##### Latency routing policy
+
+Redirect to the server that has the least latency close to clients.
+
+1. Hepful when latency is important
+2. Latency is evaluated in terms of user-aws region distance (not geologically)
+
+
+##### Geo location routing policy
+
+Routing based on user **location**. Can be hard-coded like traffic from a certain country goes to a certain endpoint, etc.
+
+##### Geoproximity Routing Policy
+
+based on geographic location of **users and resourcs**.
+
+Can use **bias** to influence default traffic redirection policy.
+
+Must use **Route 53 Traffic Flow** to use this feature.
+
+##### Multi-value routing policy
+
+Use when routing traffic to multiple resources. Up to **8** health records are returned. You can use it to associate health check with different resources.
+
+However, it is not a substitute for Elastic Load Balancer.
+
+#### Health Checks
+
+Default health check interval: **30s** ( can set to **10s** with higher cost)
+
+**15** health checkers check the endpoint so about **2s** average interval.
+
+Health checks can be linked to Route 53 queries.
+
 # Tables and Quick Reference
+
+TODO
+
+# Solutions Architecture Examples
+
+## Classic Solution Architecture
+
+### Whatisthetime.com
+
+Stateless web app
+
+#### Step by step incremental improvement
+
+1. single instance service
+2. scaled both vertically & horizontally
+3. add DNS server with TTL of 1 hour
+4. add load balancer with health check and restricted security group rules
+5. add auto-scaling group to manage EC2 instances
+6. make app multi-AZ
+7. reserve capacity of 2 in 2 different AZs for cost saving
+
+### MyClothes.com
+
+Stateful web app
+
+Starting with LB, Route 53 and a multi-AZ ASG.
+
+#### Step by step incremental improvement
+
+1. Introduce stickiness
+   1. introduce user cookies
+   2. Add ElasticCache/DynamoDB to store and retrive user session data
+2. Storing user data in Amazon RDS database
+   1. Scaling reads by 
+      1. adding RDS read replicas
+      2. adding ElasticCache layer ( can also implement write-through)
+   2. Upgrade RDS to multi-AZ to surivive disaster
+3. Enforce security groups
+   1. ELB to EC2
+   2. EC2 to RDS
+   3. EC2 to ElasticCache
+
+
+### Mywordpress.com
+
+access and display uploaded pictures.
+
+Start with a multi-AZ LB, multi-AZ ASG and multi AZ RDS
+
+#### Step by step incremental improvement
+
+1. Use multi-AZ Aurora DB with read replicas
+2. Store images with EBS (single instance application)
+3. Store images with EFS (distributed application)
+
+### Instantiating App quickly
+
+EC2 instances:
+
+1. Use a Golden AMI
+2. Bootstrap using User data
+3. Hybrid: mix Golden AMI and user data (Elastic Beanstalk)
+
+
+RDS Database:
+
+1. Restore from snapshot
+
+EBS Volume:
+
+1. Restore from snapshot
+
+
+Typical 3-tier web app architecture:
+
+![3-tier architecture](https://miro.medium.com/max/700/1*e7YeHUMESPtgjXtSzk_Ttw.png)
