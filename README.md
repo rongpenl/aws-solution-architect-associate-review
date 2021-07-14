@@ -79,17 +79,43 @@
         - [Aurora serverless](#aurora-serverless)
         - [Aurora Global Database](#aurora-global-database)
         - [Aurora machine learning](#aurora-machine-learning)
-    - [ElasticCache](#elasticcache)
+    - [S3 (Simple Storage Service)](#s3-simple-storage-service)
       - [Overview](#overview-2)
+      - [S3 Storage class](#s3-storage-class)
+        - [Glacier & Glacier Deep Archive](#glacier--glacier-deep-archive)
+      - [S3 object lock](#s3-object-lock)
+      - [S3 moving between storage classes](#s3-moving-between-storage-classes)
+      - [S3 analytics](#s3-analytics)
+      - [S3 performance](#s3-performance)
+        - [S3 performance improvement](#s3-performance-improvement)
+        - [S3 byte-range fetches](#s3-byte-range-fetches)
+        - [S3 Select & Glacier Select](#s3-select--glacier-select)
+      - [S3 event notification](#s3-event-notification)
+      - [S3 requester pays](#s3-requester-pays)
+      - [S3 versioning](#s3-versioning)
+      - [S3 encryption](#s3-encryption)
+        - [Encryption at rest](#encryption-at-rest)
+        - [Encryption in transit](#encryption-in-transit)
+      - [S3 security](#s3-security)
+        - [S3 bucket policy](#s3-bucket-policy)
+        - [S3 security (others)](#s3-security-others)
+        - [S3 replication (cross region & same region)](#s3-replication-cross-region--same-region)
+      - [S3 websites](#s3-websites)
+      - [S3 consistency model](#s3-consistency-model)
+      - [S3 Pre-signed URLs](#s3-pre-signed-urls)
+    - [ElasticCache](#elasticcache)
+      - [Overview](#overview-3)
       - [Redis vs Memcached](#redis-vs-memcached)
       - [Use cases](#use-cases)
         - [DB Cache](#db-cache)
         - [User session store](#user-session-store)
       - [Cache Security](#cache-security)
       - [ElasticCache Patterns](#elasticcache-patterns)
+  - [Analytics](#analytics)
+    - [AWS Athena](#aws-athena)
   - [Network](#network)
     - [Route 53](#route-53)
-      - [Overview](#overview-3)
+      - [Overview](#overview-4)
       - [Route 53 as a domain registrar](#route-53-as-a-domain-registrar)
       - [Route 53 advanced features](#route-53-advanced-features)
       - [CNAME and Alias](#cname-and-alias)
@@ -101,8 +127,15 @@
         - [Geoproximity Routing Policy](#geoproximity-routing-policy)
         - [Multi-value routing policy](#multi-value-routing-policy)
       - [Health Checks](#health-checks-1)
+    - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
+      - [Overview](#overview-5)
 - [Tables and Quick Reference](#tables-and-quick-reference)
-- [Solutions Architecture Examples](#solutions-architecture-examples)
+- [Solutions Architecturing](#solutions-architecturing)
+  - [Developing on AWS](#developing-on-aws)
+    - [EC2 instance metadata](#ec2-instance-metadata)
+    - [AWS SDK](#aws-sdk)
+      - [SDK credential security](#sdk-credential-security)
+      - [Exponential backoff](#exponential-backoff)
   - [Classic Solution Architecture](#classic-solution-architecture)
     - [Whatisthetime.com](#whatisthetimecom)
       - [Step by step incremental improvement](#step-by-step-incremental-improvement)
@@ -775,6 +808,213 @@ Simple, optimized and secure integration between Aurora and AWS machine learning
 1. Amazon SageMaker
 2. Amazon Comprehend
 
+### S3 (Simple Storage Service)
+
+#### Overview
+
+Bucket -> directory
+object -> file
+
+Buckets must have globally unique name but they are defined at region level.
+
+Bucket naming convention:
+
+1. no uppercase
+2. no underscore
+3. not an IP address.
+
+S3 can be treated as a key-value store whose key is the path to the object.
+
+The full path has the following pattern: `s3://bucket-name/prefix/object-name`
+
+Max file size: 5TB. If you want to upload a file larger than 5GB, you need to use multipart upload.
+
+#### S3 Storage class
+
+|              | Standard                         | Standard IA                      | Standard One Zone IA                 | Intelligent Tieerng  | Glaciere (archive in valuts)        | Glacier Deep Archive |
+| ------------ | -------------------------------- | -------------------------------- | ------------------------------------ | -------------------- | ----------------------------------- | -------------------- |
+| Durability   | 99.999999999% across multiple AZ | 99.999999999% across multiple AZ | 99.999999999% in one AZ              | Same as Standard     |                                     |                      |
+| Availability | 99.99% across multiple AZ        | 99.9% across multiple AZ         | 99.5%                                | 99.9%                |                                     |                      |
+| Cost         | standard                         | lower cost than standard         | lower cost than standard IA          | has auto-tiering fee | Low cost  $0.004/GB + retrieval fee |                      |
+| Use cases    | general purpose                  | disaster recovery, backup        | secondary backup and recretable data |                      | 10s of years storage                |                      |
+
+##### Glacier & Glacier Deep Archive
+
+Retrieval options
+
+Glacier: minimal storage of **90** days
+
+1. Expedited 1-5 minutes
+2. Standard 3-5 hours
+3. Bulk 5-12 hours
+
+Glacier Valut lock. Adopt a WORM (write once, read many) model. Helpful for compliance and data rentention.
+
+Glacier Deep Archieve: minimal storage of **180** days
+
+1. Standard 12 hours
+2. Bulk 48 hours
+
+#### S3 object lock
+
+1. must enable versioning
+2. adopt a WORM (write once, read many) model
+3. block object version deletion for a specific amount of time
+4. Modes
+   1. governance mode
+   2. compliance mode
+
+#### S3 moving between storage classes
+
+Moving objects can be automated with lifecycle configuration
+
+Rules can be created for certain prefix or object tags.
+
+1. Transition actions
+2. Expiration actions
+
+#### S3 analytics 
+
+Help determine when to transition objects from standard to standard IA.
+
+#### S3 performance
+
+S3 automatcially scales up to high request rates.
+
+Can achieve at least 3,500 PUT/COPY/POST/DELETE and 5,500 GET/HEAD requests **per second per prefix** in a bucket.
+
+KMS encryption will impact S3 performance. KMS quota persecond can be increased upon request.
+
+##### S3 performance improvement
+
+1. Multi-part upload
+   1. recommended for file larger than 100 MB
+   2. must enable for file > 5 GB
+   3. parallel uploads
+2. S3 Transfer Acceleration
+   1. transfering file to an aws edge location first
+   2. compatible with multi-part upload
+
+##### S3 byte-range fetches
+
+Parallel GET by requesting specific byte ranges
+
+Use cases:
+
+1. speed up downloads
+2. retrieve partial data (head of file, etc)
+
+##### S3 Select & Glacier Select
+
+Use SQL to perform **server side filtering**.
+
+1. less network transfer
+2. less CPU on client side
+
+
+#### S3 event notification
+
+"S3" events like "ObjectRemoved", "ObjectCreated", etc.
+
+#### S3 requester pays
+
+Enabled at buckets level. Requesters must be authenticated with AWS identities. They pay for the networking cost.
+
+#### S3 versioning
+
+Versioning can be enabled at bucket level. Versioning can protect unintended deletes. 
+
+Any object that was not versioned will have version null.
+
+#### S3 encryption
+
+##### Encryption at rest
+
+|                     | SSE-S3                                   | SSE-KMS                                   | SSE-C                                    | **client side** encryption  |
+| ------------------- | ---------------------------------------- | ----------------------------------------- | ---------------------------------------- | --------------------------- |
+| Who handles the key | S3                                       | AWS KMS                                   | User                                     | Not applicable              |
+| Encryption type     | AES-256                                  |                                           |                                          |                             |
+| http(s) note        | "x-amz-server-side-encryption": "AES256" | “x-amz-server-side-encryption": ”aws:kms" | enforce  https and provide key in header | customer manages everything |
+
+##### Encryption in transit
+
+HTTPS is mandatory for SSE-C.
+
+Both HTTP and HTTPS can be used in general.
+
+#### S3 security
+
+|     | User based   | Resource based                           |
+| --- | ------------ | ---------------------------------------- |
+|     | IAM policies | Bucket policies: **allow cross account** |
+|     |              | Object ACL                               |
+|     |              | Bucket ACL                               |
+
+An IAM principal can access an S3 bucket if 
+
+1. IAM permission allows it **OR** resource policy allows it
+2. **AND** no explicit DENY.
+
+##### S3 bucket policy
+
+JSON based, very much like [IAM policies](#iam-policies). 
+
+S3 bucket policy can be used to grant access to another account.
+
+##### S3 security (others)
+
+1. Networking: supports VPC endpoint
+2. Logging and Audit:
+   1. Access logs
+   2. API call logs in CloudTrail
+3. User security:
+   1. MFA delete (must enable versioning first)
+   2. Pre-signed URLs (limited time access)
+
+MFA-Delete:
+
+1. Only bucket owner (root account) can enable/disable MFA-Delete.
+2. Can only be enabled using CLI
+
+S3 access logs:
+
+Any requests made to S3, from any account, authorized or denied will be logged into **another** S3 bucket.
+
+##### S3 replication (cross region & same region)
+
+Must enable versioning first.
+
+1. Buckets can be in different accounts
+2. asynchronous
+3. needs proper IAM permission
+4. not retroactive
+5. optional DELETE operation replication
+6. not chained
+
+Use cases:
+
+1. CRR: compliance, lower latency access, replication across accounts
+2. SRR: log aggregation, replication between prod and dev.
+
+#### S3 websites
+
+S3 can host static website. If error **403**, check bucket policy to allow public reads.
+
+Need to enable CORS if resources are in different buckets.
+
+#### S3 consistency model
+
+After successful write, update or delete, read and list requests will **immediately** reflect the changes.
+
+#### S3 Pre-signed URLs
+
+1. Valid default for 3600 seconds (1 hour). 
+2. Inheret the permissions of the person who generated the URL for GET/PUT (Put must use SDK to generate).
+  
+Use cases:
+
+1. allow premium resources download
+2. temporarily allow uploading
 
 ### ElasticCache
 
@@ -821,6 +1061,17 @@ User hits another instance and session data in ElasticCache ensure that user is 
 1. Lazy Loading: all read data is cached
 2. Write through: adds or update data in the cache when updated to a db
 3. Session store: store temporary session data in cache
+
+
+
+## Analytics
+
+### AWS Athena
+
+1. **Serverless** service to perform analytics on S3 files.
+2. Use SQL
+3. Has JDBC/ODBC driver
+4. Support CSV, JSON, ORC, Avro, Parquet
 
 
 ## Network
@@ -928,11 +1179,62 @@ Default health check interval: **30s** ( can set to **10s** with higher cost)
 
 Health checks can be linked to Route 53 queries.
 
+### AWS Elastic Beanstalk
+
+#### Overview
+
+Elastic Beanstalk is a developer centric view of deploying an application on AWS. Use common components but still have full control over the configuration.
+
+Developer is only responsible for the application code.
+
+Beanstalk is free but you pay for the underlying services.
+
+Three architectures:
+
+1. single instance
+2. ASG + LB
+3. ASG only
+
+Three components:
+
+1. Application
+2. Application version
+3. Environment name (dev, test, prod, etc)
+
+Workflow:
+
+![workflow EB](https://docs.aws.amazon.com/zh_cn/elasticbeanstalk/latest/dg/images/clearbox-flow-00.png)
+
 # Tables and Quick Reference
 
 TODO
 
-# Solutions Architecture Examples
+# Solutions Architecturing
+
+## Developing on AWS
+
+Q: How to interact with AWS resources and services.
+
+### EC2 instance metadata
+
+EC2 instance can access metadata via `http://169.254.169.254/latest/meta-data`. The IAM role name can be accessed but not IAM policy.
+
+### AWS SDK
+
+1. AWS CLI is using Python SDK boto3.
+2. SDk default region is `us-east-1`.
+
+#### SDK credential security
+
+1. credentials at `~/.aws/credentials`
+2. instance profile credentials using IAM roles
+3. environemntal variables
+
+Never store credentials in code.
+
+#### Exponential backoff
+
+SDK API calls include retry mechanism with exponential backoff.
 
 ## Classic Solution Architecture
 
