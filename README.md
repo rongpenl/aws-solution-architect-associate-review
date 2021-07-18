@@ -1,5 +1,3 @@
-
-
 - [Notes](#notes)
   - [Services overview](#services-overview)
     - [Regions & Availability Zones (AZs)](#regions--availability-zones-azs)
@@ -62,6 +60,17 @@
       - [ASG scaling policies](#asg-scaling-policies)
         - [Termination policy](#termination-policy)
         - [ASG lifecycle hooks](#asg-lifecycle-hooks)
+  - [AWS CloudFront](#aws-cloudfront)
+    - [Origins](#origins)
+    - [CloudFront vs S3 Cross Region Replication](#cloudfront-vs-s3-cross-region-replication)
+    - [ClounFront Signed URL & Signed Cookies](#clounfront-signed-url--signed-cookies)
+    - [CloudFront Multiple Origin](#cloudfront-multiple-origin)
+    - [Origin Groups](#origin-groups)
+    - [CloudFront Geo Restriction](#cloudfront-geo-restriction)
+    - [CloudFront Pricing](#cloudfront-pricing)
+  - [AWS Global Accelerator](#aws-global-accelerator)
+    - [Features:](#features-1)
+    - [Unicast & anycast IP](#unicast--anycast-ip)
   - [Storage](#storage)
     - [RDS (Relational Database Service)](#rds-relational-database-service)
       - [Overview](#overview)
@@ -111,6 +120,20 @@
         - [User session store](#user-session-store)
       - [Cache Security](#cache-security)
       - [ElasticCache Patterns](#elasticcache-patterns)
+    - [AWS Snow family](#aws-snow-family)
+      - [Data migration](#data-migration)
+      - [Edge computing](#edge-computing)
+      - [AWS OpsHub](#aws-opshub)
+    - [AWS Storage Gateway](#aws-storage-gateway)
+      - [File Gateway](#file-gateway)
+      - [Volume Gateway](#volume-gateway)
+      - [Tape Gateway](#tape-gateway)
+      - [Hardware appliance](#hardware-appliance)
+      - [Storage gateway exam tips](#storage-gateway-exam-tips)
+    - [AWS FSx](#aws-fsx)
+      - [AWS FSx for windows](#aws-fsx-for-windows)
+      - [AWS FSx for Lustre](#aws-fsx-for-lustre)
+      - [FSx file system deployment options](#fsx-file-system-deployment-options)
   - [Analytics](#analytics)
     - [AWS Athena](#aws-athena)
   - [Network](#network)
@@ -190,10 +213,10 @@ Each region usually have 3 AZs, but some regions have only 2 AZs. The maximal nu
 7. An AWS account can have multiple AWS users.
 
 ```plaintext
-There are two different types of users in AWS. 
-You are either the account owner (root user) or 
-you are an AWS Identity and Access Management (IAM) user. 
-The root user is created when the AWS account is created and 
+There are two different types of users in AWS.
+You are either the account owner (root user) or
+you are an AWS Identity and Access Management (IAM) user.
+The root user is created when the AWS account is created and
 IAM users are created by the root user or an IAM administrator for the account.
 ```
 
@@ -234,13 +257,13 @@ You can access AWS in three different ways:
 
 ### IAM roles
 
-Certain AWS services can have IAM roles to perform tasks on behalf of the user. 
+Certain AWS services can have IAM roles to perform tasks on behalf of the user.
 
 1. EC2 instance roles
 2. Lambda function roles
 3. Roles for Cloudformation
 
-### IAM security 
+### IAM security
 
 1. IAM Credentials Report (**account level**)
    1. account's users' credentials
@@ -251,7 +274,6 @@ Certain AWS services can have IAM roles to perform tasks on behalf of the user.
 ### The shared responsibility model
 
 ![shared responsibility model](https://d1.awsstatic.com/security-center/Shared_Responsibility_Model_V2.59d1eccec334b366627e9295b304202faf7b899b.jpg)
-
 
 ## Elastic Computing Cloud (EC2)
 
@@ -273,7 +295,6 @@ Firewall rules: use **security groups**
 
 Bootstrap script: EC2 User Data (**not data** but a script). The script only run **once** when the instance **first** starts. It runs with the **root** user.
 
-
 ### EC2 types
 
 1. General purpose (T)
@@ -282,7 +303,6 @@ Bootstrap script: EC2 User Data (**not data** but a script). The script only run
 4. Storage Optimized (I D H)
 
 Reference: https://instances.vantage.sh/
-
 
 ### Security Groups
 
@@ -296,16 +316,16 @@ Reference: https://instances.vantage.sh/
 #### Policies
 
 1. security groups only contain explicit **allow** rules
-    1. Access to ports
-    2. authorized ip ranges
-    3. control of inbound traffic
-    4. control of outbound ranges
+   1. Access to ports
+   2. authorized ip ranges
+   3. control of inbound traffic
+   4. control of outbound ranges
 
 ### EC2 purchasing options
 
 #### Purchasing types
 
-1. On-Demand 
+1. On-Demand
 2. Reserved (**Minimum 1 year**)
    1. reserved (long workload)
    2. convertible reserved instances (change instance type)
@@ -320,7 +340,6 @@ Reference: https://instances.vantage.sh/
    4. control instance placement
 5. Dedicated instances (no other **customers** will share your hardware)
    1. no control over instance placement
-
 
 #### Spot instances
 
@@ -341,10 +360,9 @@ Control over the EC2 Instance placement strategy
    1. across AZ, reduce failure, different hardwares
    2. suitable for jobs of high avaibility
 3. Partition (max **7 partitions** per AZ, each partition can have **100s of EC2 instances**)
-   1.  partition information is treated as metadata for EC2 instances
-   2.  partitions failure won't affect other partitions
-   3.  suitable for tasks like **Hadoop, Kafka, Cassandra**
-
+   1. partition information is treated as metadata for EC2 instances
+   2. partitions failure won't affect other partitions
+   3. suitable for tasks like **Hadoop, Kafka, Cassandra**
 
 ### AMI (Amazon Machine Image)
 
@@ -394,7 +412,6 @@ The **io1** and **io2** types can be attached to multiple instances in the **sam
 4. to encrypt unencrypted EBS volumes, use **encrypted snapshots**.
 5. no manual management, minimal impact on latency.
 
-
 ##### EBS RAID
 
 Motivation:
@@ -406,7 +423,6 @@ Common options:
 
 1. RAID 0 (**increase performance**): combine volumes to increase total disk space and IOPS. **No redudancy**. Subject to risk of loss of data.
 2. RAID 1 (**increase fault tolerance**): mirroring a volume to another.
-
 
 #### EFS (Elastic File System)
 
@@ -424,8 +440,6 @@ Common options:
 | Mount     | **One** instance at a time, io support multi-attachement in same AZ | Support 100s instances |
 | Migration | take snapshot and restore snapshot in another AZ                    | No need                |
 | OS        | Flexible                                                            | Linux Only             |
-
-
 
 #### EC2 instance store
 
@@ -445,7 +459,7 @@ Public IPs are
 4. subject to change for restarted instances
 5. All IPv6 are public
 
-Private IPs are 
+Private IPs are
 
 1. idenfiable in private network
 2. unique across private network
@@ -459,7 +473,7 @@ Elastic IP
 3. **Avoid using EIPs**
    1. Usually poor architectural designs
    2. Use random public IPs and DNS
-   3. Use load balancer 
+   3. Use load balancer
 
 #### Elastic Network Interfaces
 
@@ -477,11 +491,11 @@ Possible attributes:
 
 1. **Stop**: data on EBS (Elastic block store) is kept intact
 2. **Terminate** : data on EBS is deleted
-3. **Hibernate**: data on RAM is preserved. 
+3. **Hibernate**: data on RAM is preserved.
    1. Booting is much faster.
    2. Root EBS volume must be encrypted.
    3. **Doesn't** support **T** instance
-   4. **Doesn't** support bare metal instances 
+   4. **Doesn't** support bare metal instances
    5. Only for on-demand and reserved instances
    6. No hibernated more than **60** days.
 
@@ -490,7 +504,6 @@ Possible attributes:
 Next generation virtualization for EC2 instances.
 
 Higher speed EBS (64,000 EBS IOPS, currentmax 32,000 for non-Nitro instances)
-
 
 ## Load Balancing and Auto-scaling
 
@@ -519,10 +532,9 @@ Advantanges of using a load balancer:
 
 #### Facts and knowledge
 
-1. **4xx** errors are client induced errors 
+1. **4xx** errors are client induced errors
 2. **5xx** errors are server errors.
 3. Load Balancer Errors **503** means at capacity or no registered target
-
 
 #### Health checks
 
@@ -550,7 +562,7 @@ Enables LB to know status of instances
    7. application server doesn't see IP of clients, which is stored in **X-Forwarded-For** header.
 3. Network LB
    1. forward TCP & UDP traffic to instance
-   2. less latency ~ 100ms 
+   2. less latency ~ 100ms
    3. has **one static IP per AZ**. (helpful for whitelisting specific IP)
    4. no free tier
 4. Gateway LB (not discussed here)
@@ -586,7 +598,6 @@ SSL with LB
    2. needs multiple CLB to support multiple hostnames with multiple SSL certificates
 2. ALB & NLB
    1. multiple SSL certificates with SNI
-
 
 ##### Server Name Indication (SNI)
 
@@ -658,7 +669,7 @@ Example:
 2. simple step scaling
 3. scheduled action
 
-Scaling cooldowns makes sure that one action finishes before another one is triggered. 
+Scaling cooldowns makes sure that one action finishes before another one is triggered.
 
 ##### Termination policy
 
@@ -672,6 +683,96 @@ Default termination policy balances the number of instances across AZ.
 1. Pending state
 2. Terminating state
 
+## AWS CloudFront
+
+CloudFront is a Content Delivery Network (CDN)
+
+1. 216 point of presense globally
+2. DDoS protection, integratd with Shield, AWS WAF.
+3. Can expose external https and talk to internal https backends.
+
+### Origins
+
+1. S3 bucket
+   1. security with CloudFront Origin Access Identity (OAI)
+   2. can be used as ingress
+2. Custom Origin (http)
+   1. ALB (must be public, EC2 behind it can be private)
+   2. EC2 (must be public)
+   3. S3 website
+   4. any other http backends
+
+### CloudFront vs S3 Cross Region Replication
+
+|                | CloudFront       | S3 CRR                              |
+| -------------- | ---------------- | ----------------------------------- |
+| where          | Global edge      | regions where replication is set up |
+| data freshness | cached for a TTL | updated near real time              |
+| use cases      | static resources | dynamic content                     |
+
+### ClounFront Signed URL & Signed Cookies
+
+Policy can
+
+1. include URL expiration
+2. include ip ranges limitation
+3. specify trusted signers ( which AWS accounts can create signed URLS)
+
+|     | CloudFront Signed URL                               | S3 pre-signed URL                                                             |
+| --- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
+|     | Use account wide key-pair that only root can manage | Use IAM key of the signing principal, inherent the permission of the IAM role |
+|     | can filter by IP, date, expiration                  | limited lifetime                                                              |
+|     | caching                                             | no caching                                                                    |
+
+### CloudFront Multiple Origin
+
+Match path pattern or content type to route to different kinds of origins
+
+### Origin Groups
+
+Increase high-availability by using multiple origins in an origin group. If the primary origin fails, the secondary origin will be used.
+
+### CloudFront Geo Restriction
+
+Create whitelist or blacklist
+
+Use cases: to comply with copyright laws.
+
+### CloudFront Pricing
+
+1. Class All
+2. Class 200 (exclude most expensive regions)
+3. Class 100 (only the least expensive regions)
+
+## AWS Global Accelerator
+
+Allow users to leverage AWS internal network to route to your application.
+
+Works with Elastic IP, EC2 instance, ALB, NLB, public or private.
+
+### Features:
+
+1. Consistent performance
+   1. no issue with client cache as IP doesn't change
+   2. intelligent routing
+2. Health check
+3. Security
+   1. only 2 external IP
+   2. DDoS protection with AWS shield.
+
+### Unicast & anycast IP
+
+1. unicast IP: one server holds one IP address
+2. anycast IP: all servers hold the same IP address
+
+AWS Global accelerator create 2 anycast IP for your application and anycast IP send traffic directly to edge locations, which forward traffic to your application.
+
+|     | CloudFront                                          | Global Accelerator                                                                       |
+| --- | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+|     | both cacheable content and dynamic content like API | wider range of applications over TCP or UDP                                              |
+|     | content served at the edge                          |                                                                                          |
+|     |                                                     | good fit for non-http use like gaming, IOT or voice over IP                              |
+|     |                                                     | good for http cases that require static IP address, deterministic fast regional failover |
 
 ## Storage
 
@@ -698,7 +799,7 @@ Advantages:
 4. **Read replicas** for improved read performance
 5. Multi AZ setup for DR (Disaster Recovery)
 6. Maintenance windows for upgrades
-7. Scaling capability (vertical and horizontal) 
+7. Scaling capability (vertical and horizontal)
 8. Storage backed by EBS (gp2 or io1)
 
 But you **can't SSH** to the RDS instance.
@@ -736,11 +837,11 @@ Cost: in-region is free, cross region needs payment.
 4. Free
 5. **Not used for scaling** but for stand-by instance
 
-#### RDS security 
+#### RDS security
 
 ##### Encryption
 
-At rest: 
+At rest:
 
 1. If master is not encrypted, the read replica can't be encrypted.
 2. encrypted at launch time
@@ -771,7 +872,7 @@ Access Management
 
 1. Proprietary
 2. Up to 64TB
-3. up to 15 replicas 
+3. up to 15 replicas
 4. HA native
 5. more expensive
 6. support multiple-master
@@ -831,12 +932,12 @@ Max file size: 5TB. If you want to upload a file larger than 5GB, you need to us
 
 #### S3 Storage class
 
-|              | Standard                         | Standard IA                      | Standard One Zone IA                 | Intelligent Tieerng  | Glaciere (archive in valuts)        | Glacier Deep Archive |
-| ------------ | -------------------------------- | -------------------------------- | ------------------------------------ | -------------------- | ----------------------------------- | -------------------- |
-| Durability   | 99.999999999% across multiple AZ | 99.999999999% across multiple AZ | 99.999999999% in one AZ              | Same as Standard     |                                     |                      |
-| Availability | 99.99% across multiple AZ        | 99.9% across multiple AZ         | 99.5%                                | 99.9%                |                                     |                      |
-| Cost         | standard                         | lower cost than standard         | lower cost than standard IA          | has auto-tiering fee | Low cost  $0.004/GB + retrieval fee |                      |
-| Use cases    | general purpose                  | disaster recovery, backup        | secondary backup and recretable data |                      | 10s of years storage                |                      |
+|              | Standard                         | Standard IA                      | Standard One Zone IA                 | Intelligent Tieerng  | Glaciere (archive in valuts)       | Glacier Deep Archive |
+| ------------ | -------------------------------- | -------------------------------- | ------------------------------------ | -------------------- | ---------------------------------- | -------------------- |
+| Durability   | 99.999999999% across multiple AZ | 99.999999999% across multiple AZ | 99.999999999% in one AZ              | Same as Standard     |                                    |                      |
+| Availability | 99.99% across multiple AZ        | 99.9% across multiple AZ         | 99.5%                                | 99.9%                |                                    |                      |
+| Cost         | standard                         | lower cost than standard         | lower cost than standard IA          | has auto-tiering fee | Low cost $0.004/GB + retrieval fee |                      |
+| Use cases    | general purpose                  | disaster recovery, backup        | secondary backup and recretable data |                      | 10s of years storage               |                      |
 
 ##### Glacier & Glacier Deep Archive
 
@@ -873,7 +974,7 @@ Rules can be created for certain prefix or object tags.
 1. Transition actions
 2. Expiration actions
 
-#### S3 analytics 
+#### S3 analytics
 
 Help determine when to transition objects from standard to standard IA.
 
@@ -911,7 +1012,6 @@ Use SQL to perform **server side filtering**.
 1. less network transfer
 2. less CPU on client side
 
-
 #### S3 event notification
 
 "S3" events like "ObjectRemoved", "ObjectCreated", etc.
@@ -922,7 +1022,7 @@ Enabled at buckets level. Requesters must be authenticated with AWS identities. 
 
 #### S3 versioning
 
-Versioning can be enabled at bucket level. Versioning can protect unintended deletes. 
+Versioning can be enabled at bucket level. Versioning can protect unintended deletes.
 
 Any object that was not versioned will have version null.
 
@@ -930,11 +1030,11 @@ Any object that was not versioned will have version null.
 
 ##### Encryption at rest
 
-|                     | SSE-S3                                   | SSE-KMS                                   | SSE-C                                    | **client side** encryption  |
-| ------------------- | ---------------------------------------- | ----------------------------------------- | ---------------------------------------- | --------------------------- |
-| Who handles the key | S3                                       | AWS KMS                                   | User                                     | Not applicable              |
-| Encryption type     | AES-256                                  |                                           |                                          |                             |
-| http(s) note        | "x-amz-server-side-encryption": "AES256" | “x-amz-server-side-encryption": ”aws:kms" | enforce  https and provide key in header | customer manages everything |
+|                     | SSE-S3                                   | SSE-KMS                                   | SSE-C                                   | **client side** encryption  |
+| ------------------- | ---------------------------------------- | ----------------------------------------- | --------------------------------------- | --------------------------- |
+| Who handles the key | S3                                       | AWS KMS                                   | User                                    | Not applicable              |
+| Encryption type     | AES-256                                  |                                           |                                         |                             |
+| http(s) note        | "x-amz-server-side-encryption": "AES256" | “x-amz-server-side-encryption": ”aws:kms" | enforce https and provide key in header | customer manages everything |
 
 ##### Encryption in transit
 
@@ -950,14 +1050,14 @@ Both HTTP and HTTPS can be used in general.
 |     |              | Object ACL                               |
 |     |              | Bucket ACL                               |
 
-An IAM principal can access an S3 bucket if 
+An IAM principal can access an S3 bucket if
 
 1. IAM permission allows it **OR** resource policy allows it
 2. **AND** no explicit DENY.
 
 ##### S3 bucket policy
 
-JSON based, very much like [IAM policies](#iam-policies). 
+JSON based, very much like [IAM policies](#iam-policies).
 
 S3 bucket policy can be used to grant access to another account.
 
@@ -1008,9 +1108,9 @@ After successful write, update or delete, read and list requests will **immediat
 
 #### S3 Pre-signed URLs
 
-1. Valid default for 3600 seconds (1 hour). 
+1. Valid default for 3600 seconds (1 hour).
 2. Inheret the permissions of the person who generated the URL for GET/PUT (Put must use SDK to generate).
-  
+
 Use cases:
 
 1. allow premium resources download
@@ -1034,7 +1134,6 @@ Use cases:
 | Backup and restore | Yes                                | No                                  |
 |                    |                                    | multi-threading architecture        |
 
-
 #### Use cases
 
 ##### DB Cache
@@ -1053,7 +1152,7 @@ User hits another instance and session data in ElasticCache ensure that user is 
 #### Cache Security
 
 1. **No IAM authentication**
-2. **Redis AUTH** available 
+2. **Redis AUTH** available
 3. Memcached support sasl-based authentication
 
 #### ElasticCache Patterns
@@ -1062,6 +1161,107 @@ User hits another instance and session data in ElasticCache ensure that user is 
 2. Write through: adds or update data in the cache when updated to a db
 3. Session store: store temporary session data in cache
 
+### AWS Snow family
+
+Snowball can't import to Glacier directly. Must go through S3 first in combination with S3 lifecycle policy.
+
+#### Data migration
+
+1. Snowcone
+2. Snowball Edge
+3. SNowmobile
+
+|                | Snowcone (smallest)         | Snowball Edge (have compute optimized or storage optimized versions) | Snowmobile              |
+| -------------- | --------------------------- | -------------------------------------------------------------------- | ----------------------- |
+|                | 8TB                         | 80TB                                                                 | < 100 PB                |
+| migration size | < 24 TB, online and offline | up to petabytes, offline                                             | up to exabytes, offline |
+| datasync agent | builtin                     | no                                                                   | no                      |
+
+#### Edge computing
+
+1. Snowcone
+2. Snowball Edge
+
+#### AWS OpsHub
+
+A software to manage AWS snow family devices.
+
+### AWS Storage Gateway
+
+AWS is pushing for hybrid cloud, connecting on-premise data storage with AWS cloud.
+
+Three types on the user side:
+
+1. Volume (EBS, EC2 instance store)
+2. File (EFS, FSx)
+3. Object (S3, Glacier)
+
+Three major services on the AWS side:
+
+1. EBS
+2. S3
+3. Glacier
+
+#### File Gateway
+
+Configure S3 bucket with NFS and SMB protocols. Support S3 standard, S3 IA and S3 one zone IA. Can mount on any servers.
+
+Can integrate with **Active Directory** for user authentication.
+
+![NFS protocol file gateway](https://d1.awsstatic.com/cloud-storage/Amazon%20S3%20File%20Gateway%20How%20It%20Works%20Diagram.96e9f7180c6ec8b6212b4d6fadc4a9ac4507b421.png)
+
+#### Volume Gateway
+
+Block storage using iSCSI protocol backed by S3.
+Backed by EBS snapshots which can help restore on-premises volumes.
+
+1. cached volumes: low latency access to most recent data
+2. stored volumes: entire dataset is on premise
+
+![volume gateway](https://d1.awsstatic.com/cloud-storage/volume-gateway-diagram.eedd58ab3fb8a5dcae088622b5c1595dac21a04b.png)
+
+#### Tape Gateway
+
+Virtual Tape Library (VTL) backed by Amazon S3 and Glacier.
+
+#### Hardware appliance
+
+1. on-premise virtualization
+2. storage gateway hardware appliance
+
+#### Storage gateway exam tips
+
+| Keywords                           | Services           |
+| ---------------------------------- | ------------------ |
+| On-premise storage to the cloud    | Storage gateway    |
+| File access, NFS, active directory | File gateway       |
+| Volumes/Blocks                     | Volume gateway     |
+| VTL tape                           | Tape gateway       |
+| no on-premise virtualization       | hardware appliance |
+
+### AWS FSx
+
+#### AWS FSx for windows 
+
+Fully managed windows file system share drive with active directory integration.
+
+Can be configured to be multiple AZ.
+
+#### AWS FSx for Lustre
+
+Linux + cluster -> Luxtre
+
+Parallel distributed file system for high performance computing (HPC).
+
+#### FSx file system deployment options 
+
+1. Scratch file system
+
+Temporary storage without duplication for short-term processing, optimizing cost.
+
+2. Persistent file system
+
+Long-term storage with duplicated data in same AZ. Replace failed files within minutes.
 
 
 ## Analytics
@@ -1072,7 +1272,6 @@ User hits another instance and session data in ElasticCache ensure that user is 
 2. Use SQL
 3. Has JDBC/ODBC driver
 4. Support CSV, JSON, ORC, Avro, Parquet
-
 
 ## Network
 
@@ -1107,7 +1306,6 @@ If you buy domain on 3rd party website
 1. create a hostzone in route 53
 2. update NS record on 3rd party website to use Route 53 name servers.
 
-
 Every DNS record will have a TTL (time to live)
 
 1. longer TTL: less traffic to DNS server but may be outdated
@@ -1136,10 +1334,9 @@ Alias is free and comes with native health check.
 
 Map a hostname to another hostname. Can't assign health check. If multiple records return, a random one will be chosen by the **client**.
 
-
 ##### Weighted routing policy
 
-Control the weight of the requests that go to specific endpoint. 
+Control the weight of the requests that go to specific endpoint.
 
 1. Helpful to test new versions like A/B testing
 2. Helpful to split traffic betweeen regions.
@@ -1151,7 +1348,6 @@ Redirect to the server that has the least latency close to clients.
 
 1. Hepful when latency is important
 2. Latency is evaluated in terms of user-aws region distance (not geologically)
-
 
 ##### Geo location routing policy
 
@@ -1264,7 +1460,7 @@ Starting with LB, Route 53 and a multi-AZ ASG.
    1. introduce user cookies
    2. Add ElasticCache/DynamoDB to store and retrive user session data
 2. Storing user data in Amazon RDS database
-   1. Scaling reads by 
+   1. Scaling reads by
       1. adding RDS read replicas
       2. adding ElasticCache layer ( can also implement write-through)
    2. Upgrade RDS to multi-AZ to surivive disaster
@@ -1272,7 +1468,6 @@ Starting with LB, Route 53 and a multi-AZ ASG.
    1. ELB to EC2
    2. EC2 to RDS
    3. EC2 to ElasticCache
-
 
 ### Mywordpress.com
 
@@ -1294,7 +1489,6 @@ EC2 instances:
 2. Bootstrap using User data
 3. Hybrid: mix Golden AMI and user data (Elastic Beanstalk)
 
-
 RDS Database:
 
 1. Restore from snapshot
@@ -1302,7 +1496,6 @@ RDS Database:
 EBS Volume:
 
 1. Restore from snapshot
-
 
 Typical 3-tier web app architecture:
 
