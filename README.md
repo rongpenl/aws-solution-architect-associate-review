@@ -134,11 +134,42 @@
       - [AWS FSx for windows](#aws-fsx-for-windows)
       - [AWS FSx for Lustre](#aws-fsx-for-lustre)
       - [FSx file system deployment options](#fsx-file-system-deployment-options)
+    - [AWS transfer family](#aws-transfer-family)
   - [Analytics](#analytics)
     - [AWS Athena](#aws-athena)
+  - [AWS Integration & Messaging](#aws-integration--messaging)
+    - [SQS](#sqs)
+      - [Standard Queue](#standard-queue)
+        - [Producers & Consumers](#producers--consumers)
+        - [SQS with ASG](#sqs-with-asg)
+        - [SQS security](#sqs-security)
+        - [Message visibility timeout](#message-visibility-timeout)
+      - [SQS Dead Letter Queue](#sqs-dead-letter-queue)
+      - [SQS Delay queue](#sqs-delay-queue)
+      - [SQS Temporary Queue](#sqs-temporary-queue)
+      - [SQS FIFO Queue](#sqs-fifo-queue)
+    - [SNS (Simple Notification Service)](#sns-simple-notification-service)
+      - [SNS publishing](#sns-publishing)
+      - [SNS security](#sns-security)
+      - [SNS FIFO topic](#sns-fifo-topic)
+      - [SNS message filtering](#sns-message-filtering)
+    - [Kinesis](#kinesis)
+      - [Overview](#overview-4)
+      - [Kinesis data streams (KDS)](#kinesis-data-streams-kds)
+      - [Kinesis data firehose (KDF)](#kinesis-data-firehose-kdf)
+      - [KDS vs KDF](#kds-vs-kdf)
+      - [Kinesis data analytics (KDA)](#kinesis-data-analytics-kda)
+    - [Ordering issue](#ordering-issue)
+      - [Ordering data into Kinesis (Stream)](#ordering-data-into-kinesis-stream)
+      - [Ordering data into SQS](#ordering-data-into-sqs)
+    - [SNS, SQS and Kinesis use cases](#sns-sqs-and-kinesis-use-cases)
+      - [SNS + SQS: Fan out](#sns--sqs-fan-out)
+      - [SNS FIFO + SQS FIFO Fan out](#sns-fifo--sqs-fifo-fan-out)
+      - [Kinesis vs SQS ordering](#kinesis-vs-sqs-ordering)
+    - [Messaging services comparison](#messaging-services-comparison)
   - [Network](#network)
     - [Route 53](#route-53)
-      - [Overview](#overview-4)
+      - [Overview](#overview-5)
       - [Route 53 as a domain registrar](#route-53-as-a-domain-registrar)
       - [Route 53 advanced features](#route-53-advanced-features)
       - [CNAME and Alias](#cname-and-alias)
@@ -151,7 +182,7 @@
         - [Multi-value routing policy](#multi-value-routing-policy)
       - [Health Checks](#health-checks-1)
     - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
-      - [Overview](#overview-5)
+      - [Overview](#overview-6)
 - [Tables and Quick Reference](#tables-and-quick-reference)
 - [Solutions Architecturing](#solutions-architecturing)
   - [Developing on AWS](#developing-on-aws)
@@ -1241,7 +1272,7 @@ Virtual Tape Library (VTL) backed by Amazon S3 and Glacier.
 
 ### AWS FSx
 
-#### AWS FSx for windows 
+#### AWS FSx for windows
 
 Fully managed windows file system share drive with active directory integration.
 
@@ -1253,16 +1284,25 @@ Linux + cluster -> Luxtre
 
 Parallel distributed file system for high performance computing (HPC).
 
-#### FSx file system deployment options 
+#### FSx file system deployment options
 
-1. Scratch file system
+- Scratch file system
 
 Temporary storage without duplication for short-term processing, optimizing cost.
 
-2. Persistent file system
+- Persistent file system
 
 Long-term storage with duplicated data in same AZ. Replace failed files within minutes.
 
+### AWS transfer family
+
+For file transfer into and out of Amazon S3 or Amazon EFS using the FTP protocol.
+
+1. AWS Transfer for FTP
+2. AWS Transfer for FTPS
+3. AWS Transfer for SFTP
+
+![AWS transfer family](https://d1.awsstatic.com/cloud-storage/aws-transfer-family-s3-efs-how-it-works-diagram.6ff1dc0d717f63d4207ce4670a729aabb85d0d70.png)
 
 ## Analytics
 
@@ -1272,6 +1312,211 @@ Long-term storage with duplicated data in same AZ. Replace failed files within m
 2. Use SQL
 3. Has JDBC/ODBC driver
 4. Support CSV, JSON, ORC, Avro, Parquet
+
+## AWS Integration & Messaging
+
+SQS, SNS and Kinesis to decouple applications.
+
+1. Simple Queue Service (SQS): queue model
+2. Simple Notification Service (SNS): pub/sub model
+3. Kinesis: realtime streaming model
+
+### SQS
+
+#### Standard Queue
+
+1. oldest offering.
+2. limitation of 256KB per message sent.
+3. default message retention is 4 days, maximum is 14 days.
+4. unlimited throughput and number of messages in queue.
+
+5. Can have duplicate messages: **at least once delivery**
+6. Can have out of order messages: **not FIFO**
+
+##### Producers & Consumers
+
+Producer using SDK.
+
+Consumers poll SQS for messaging (up to 10 messages at a time).
+
+Delete messages after consuming.
+
+##### SQS with ASG
+
+Cloudwatch can monitor the queue length to autoscale the number of EC2 instances consuming the queue.
+
+##### SQS security
+
+Encryption:
+
+1. In-flight using https
+2. at-rest using KMS keys
+
+Access control:
+
+1. IAM policies to regulate access to the SQS API
+
+SQS access policy:
+
+1. cross-account access
+2. allowing other services to write to an SQS queue
+
+##### Message visibility timeout
+
+After a message is polled by a consumer, it becomes invisibile to other consumers. The default message visibility timeout is **30 seconds**. If after 30 seconds the processing is not complete, the message is visibile again for other consumers.
+
+1. too low message visibility timeout, message may be processed twice.
+2. too high visibility timeout, reprocessing when crash will take long time (less efficient)
+
+#### SQS Dead Letter Queue
+
+After certain amount of times of retrying, a message is moved to a dead letter queue. Default retention is **14** days. Useful for debugging.
+
+#### SQS Delay queue
+
+Delay a message up to **15 minutes**. The default is 0 seconds.
+
+#### SQS Temporary Queue
+
+Leverage virtual queues to create/delete virtual queues with lower overhead. Useful for building request-response systems with high throughput.
+
+#### SQS FIFO Queue
+
+1. First in first out
+2. throughput is limited to 300 msg/s (without batching) and 3000 msg/s (with batching)
+3. exactly-once
+
+### SNS (Simple Notification Service)
+
+Send one message to **many** receivers.
+
+As many event listeners as we want. Up to 10,000,000 subscriptions per topic with 100,000 topic limit.
+
+Subscribers can be
+
+1. SQS
+2. http/https
+3. Lambda
+4. Emails
+5. SMS messages
+6. Mobile notification
+
+#### SNS publishing
+
+1. Topic publish (manage topics/ publish to topics/ create subscriptions using SDK)
+2. direct publish (for **mobile** apps SDK)
+
+#### SNS security
+
+Encryption:
+
+1. In-flight using https
+2. at-rest using KMS keys
+
+Access control:
+
+1. IAM policies to regulate access to the SNS API
+
+SQS access policy:
+
+1. cross-account access
+2. allowing other services to write to an SNS queue
+
+#### SNS FIFO topic
+
+1. ordering by group ID
+2. deduplication using deduplication ID or content based deduplication.
+
+SNS FIFO can only have SQS FIFO as a subscriber.
+
+Same throughput as SQS FIFO.
+
+#### SNS message filtering
+
+JSON policy used to filter messages based on certain fields.
+
+### Kinesis
+
+#### Overview
+
+Collect, process and analyze streaming data in real-time.
+
+1. Kinesis data streams
+   1. capture, process and store data streams
+2. Kinesis data firehose
+   1. **load** data streams into **aws data stores**
+3. Kinesis data analytics
+   1. **analyze** data streams using SQL or Apache Flink
+4. Kinesis video streams
+   1. capture, process and store **video** streams
+
+#### Kinesis data streams (KDS)
+
+1. Ability to **reprocess** data.
+2. Rentention can be as long as 365 days.
+3. Data is immutable.
+4. Billing is per **shard** provisioned, can have as many shards as wanted.
+
+#### Kinesis data firehose (KDF)
+
+1. Fully managed, automatic scaling, **serverless**
+2. Pay for data going through firehose
+3. Near real time processing
+4. support many data formats and customized data **transformation** using AWS lambda.
+5. No data rentention
+
+#### KDS vs KDF
+
+| Kinesis data stream                                  | Kinesis data firehose                                        |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| **streaming** services for ingesting                 | **load** streaming data into S3, Redshift, ES, http endpoint |
+| **provisioned**, SDK to write producer/customer code | fully **managed** with automatic scaling                     |
+| real-time                                            | near real-time                                               |
+| **retention** up to 365 days                         | no retention                                                 |
+| support **replay** capability                        | doesn't support replay capabilities                          |
+
+#### Kinesis data analytics (KDA)
+
+1. Perform real-time analytics on Kinesis streams
+2. automatically scaling/serverless
+3. create analytics streams out of the real-time queries
+
+### Ordering issue
+
+#### Ordering data into Kinesis (Stream)
+
+Shard-wise ordering: add partition key to the message to ensure same key 
+always go to the same shard. 
+
+#### Ordering data into SQS
+
+For standard SQS, there is no ordering. 
+
+For SQS FIFO, if there is only one consumer, there is no ordering. 
+
+For multiple consumers with SQS FIFO, add a group ID to the messages (equivalent to the partition key) to fan-out the messages to consumers. Each group maintain in-group ordering.
+
+### SNS, SQS and Kinesis use cases
+
+#### SNS + SQS: Fan out
+
+Publish once in SNS, receive in all SQS queus that are subscribers.
+
+SNS topic -> SQS queues.
+
+Make sure that access policy of SQS allows for SNS to write.
+
+Application: S3 event to multiple SQS queues with SNS topic fan-out.
+
+#### SNS FIFO + SQS FIFO Fan out
+
+1. deduplication
+2. fan out
+3. ordering
+
+#### Kinesis vs SQS ordering
+
+### Messaging services comparison 
 
 ## Network
 
