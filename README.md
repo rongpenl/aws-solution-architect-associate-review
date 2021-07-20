@@ -165,11 +165,46 @@
     - [SNS, SQS and Kinesis use cases](#sns-sqs-and-kinesis-use-cases)
       - [SNS + SQS: Fan out](#sns--sqs-fan-out)
       - [SNS FIFO + SQS FIFO Fan out](#sns-fifo--sqs-fifo-fan-out)
-      - [Kinesis vs SQS ordering](#kinesis-vs-sqs-ordering)
+      - [Kinesis vs SQS FIFP ordering](#kinesis-vs-sqs-fifp-ordering)
     - [Messaging services comparison](#messaging-services-comparison)
+    - [Other non cloud-native messaging services](#other-non-cloud-native-messaging-services)
+      - [Amazon MA (managed Apache ActiveMQ)](#amazon-ma-managed-apache-activemq)
+  - [Container](#container)
+    - [Docker basics](#docker-basics)
+    - [Docker conatiners management](#docker-conatiners-management)
+    - [ECS (Elastic Container Service)](#ecs-elastic-container-service)
+      - [IAM roles for ECS tasks](#iam-roles-for-ecs-tasks)
+      - [Data volumes (EFS file system)](#data-volumes-efs-file-system)
+      - [Porting](#porting)
+      - [ECS rolling update](#ecs-rolling-update)
+    - [Fargate (Serverless Container Platform)](#fargate-serverless-container-platform)
+      - [Porting](#porting-1)
+    - [ECR (AWS Elastic Container Registry)](#ecr-aws-elastic-container-registry)
+    - [EKS (AWS Elastic Kubernetes Service)](#eks-aws-elastic-kubernetes-service)
+  - [Serverless Overview](#serverless-overview)
+    - [AWS Lambda](#aws-lambda)
+      - [Lambda Benefits:](#lambda-benefits)
+      - [Lambda Example:](#lambda-example)
+      - [Lambda limitation](#lambda-limitation)
+      - [Lambda@Edge](#lambdaedge)
+    - [DynamoDB](#dynamodb)
+      - [Overview](#overview-5)
+      - [Basics](#basics)
+      - [Provisioned throughput](#provisioned-throughput)
+      - [DAX (DynamoDB Accelerator)](#dax-dynamodb-accelerator)
+      - [DynamoDB Streams](#dynamodb-streams)
+      - [Security and other features](#security-and-other-features)
+    - [AWS API Gateway](#aws-api-gateway)
+      - [Overview](#overview-6)
+      - [Integration](#integration)
+      - [Security](#security)
+        - [IAM permissions](#iam-permissions)
+        - [Lambda Authorizer](#lambda-authorizer)
+        - [Cognito User Pools](#cognito-user-pools)
+    - [AWS Cognito](#aws-cognito)
   - [Network](#network)
     - [Route 53](#route-53)
-      - [Overview](#overview-5)
+      - [Overview](#overview-7)
       - [Route 53 as a domain registrar](#route-53-as-a-domain-registrar)
       - [Route 53 advanced features](#route-53-advanced-features)
       - [CNAME and Alias](#cname-and-alias)
@@ -182,7 +217,7 @@
         - [Multi-value routing policy](#multi-value-routing-policy)
       - [Health Checks](#health-checks-1)
     - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
-      - [Overview](#overview-6)
+      - [Overview](#overview-8)
 - [Tables and Quick Reference](#tables-and-quick-reference)
 - [Solutions Architecturing](#solutions-architecturing)
   - [Developing on AWS](#developing-on-aws)
@@ -1485,14 +1520,14 @@ Collect, process and analyze streaming data in real-time.
 
 #### Ordering data into Kinesis (Stream)
 
-Shard-wise ordering: add partition key to the message to ensure same key 
-always go to the same shard. 
+Shard-wise ordering: add partition key to the message to ensure same key
+always go to the same shard.
 
 #### Ordering data into SQS
 
-For standard SQS, there is no ordering. 
+For standard SQS, there is no ordering.
 
-For SQS FIFO, if there is only one consumer, there is no ordering. 
+For SQS FIFO, if there is only one consumer, there is no ordering.
 
 For multiple consumers with SQS FIFO, add a group ID to the messages (equivalent to the partition key) to fan-out the messages to consumers. Each group maintain in-group ordering.
 
@@ -1514,9 +1549,276 @@ Application: S3 event to multiple SQS queues with SNS topic fan-out.
 2. fan out
 3. ordering
 
-#### Kinesis vs SQS ordering
+#### Kinesis vs SQS FIFP ordering
 
-### Messaging services comparison 
+Kinesis maintains ordering in each shard. SQS FIFO maintains order by assigining a group ID to each message.
+
+### Messaging services comparison
+
+|     | SQS                                    | SNS                            | Kinesis                    |
+| --- | -------------------------------------- | ------------------------------ | -------------------------- |
+|     | Csonsumers pull data                   | Push data to subscribers       | Standard: pull data        |
+|     | No data persistence                    | No data persistence            | data persistent for replay |
+|     | no provision                           | no provision                   | provision throughput       |
+|     | ordering for FIFO                      | ordering for FIFO              | ordering at shard level    |
+|     | can have as consumers as we want (asg) | up to 12.4 million subscribers | enhanced fan-out           |
+
+### Other non cloud-native messaging services 
+
+#### Amazon MA (managed Apache ActiveMQ)
+
+1. Doesn't scale as much as SQS/SNS 
+2. Have both queue feature and topic feature
+
+## Container 
+
+### Docker basics 
+
+Pass
+
+### Docker conatiners management 
+
+1. ECS: Elastic container service
+2. AWS fargate: serverless container platform
+3. EKS: AWS managed kubernetes  
+
+### ECS (Elastic Container Service)
+
+1. One must provision & maintain the EC2 instances that are running the ECS cluster.
+2. Integrated with ALB (Application Load Balancer)
+
+#### IAM roles for ECS tasks
+
+1. EC2 instance profile (used by the ECS agent)
+   1. EC2 instance level to interact with ECS services
+2. ECS task role
+   1. allow each task to have specific roles 
+   2. defined in the **task definition**
+
+#### Data volumes (EFS file system)
+
+1. Works for both EC2 tasks and fargate tasks
+2. across AZ
+3. Fargate + EFS = serverless application and data
+
+#### Porting 
+
+ECS uses **dynamic port number**. ALB supports finding the right port automatically but permission must be granted so ALB can access any EC2 instance ports in the EC2 instance security group policy.
+
+#### ECS rolling update
+
+Specify min, max to rolling out instance upgrades.
+
+### Fargate (Serverless Container Platform)
+
+1. No need to provision the infrastructure
+2. AWS runs containers based on CPU /RAM needed.
+
+#### Porting 
+
+Each task will have a unique **IP**. The ALB should be able to access the **task port** of the ENI (Elastic network interface).
+
+
+### ECR (AWS Elastic Container Registry)
+
+1. Store, manage and deploy containers on AWS
+2. Pay for what you use
+3. Support image vulnerability scanning, version, tag, image lifecycle, etc.
+
+
+### EKS (AWS Elastic Kubernetes Service)
+
+1. Launch managed Kubernetes clusters on AWS
+2. Supports both EC2 or fargate
+
+## Serverless Overview 
+
+This section may also contain some contents that are discussed somewhere else.
+
+Serverless services on AWS
+
+1. AWS Lambda
+2. DynamoDB
+3. AWS Cognito
+4. API Gateway
+5. S3
+6. SNS & SQS 
+7. Kinesis Data Firehose
+8. Aurora Serverless
+9. Step functions 
+10. Fargate
+
+### AWS Lambda 
+
+1. no servers to manage
+2. short executions with time limitation
+3. run on demand 
+4. automatically scaling
+
+#### Lambda Benefits:
+
+1. easy pricing with free tier computing resources
+   1. pay per calls
+   2. pay per duration
+2. integrated with whole AWS suite of services
+3. Easy monitoring with CloudWatch
+4. Support multiple languages
+   1. JS
+   2. Python
+   3. Ruby
+   4. java
+   5. etc
+
+#### Lambda Example:
+
+1. serverless thumbnail creation
+2. serverless cron jobs
+
+#### Lambda limitation
+
+1. Execution
+   1. memory allocation 128 MB - 10 GiB
+   2. execution time: 15 mins
+   3. environmental variables: 4 KB
+   4. disk capacity in the function container: 512 MB
+   5. concurrency execution: 1000
+2. deployment
+   1. deployment size: 50 MB 
+   2. size of uncompressed deployment (code + dependencies): 250 MB
+
+#### Lambda@Edge
+
+deploy AWS Lambda as deploying CDN
+
+1. more responsive application
+2. deployed globally
+3. customize the CDN content
+4. Pay only for what you use
+
+Lambda can be **inserted** to multiple stages in the request-response process between user, cloudfront and origin.
+
+### DynamoDB
+
+#### Overview
+
+1. **NoSQL** database
+2. fully managed, scales to massive workloads
+3. integrated with IAM for security, authorization and administration
+4. event-driven programming with dynamoDB streams
+5. Low cost and auto scaling capabilities.
+
+New features:
+
+1. Transactions: all or nothing
+2. On demand: automatical scales
+   1. 2.5 times more expensive than provisioned capacity
+   2. suitable for unpredictable spikes
+
+#### Basics 
+
+DynamoDB is made of **tables** whose rows are called **items**. Items have **primary keys** and attributes.
+
+Common data types include string, number, binary, list, map, set, etc.
+
+#### Provisioned throughput
+
+Must have provisioned read and write capacity
+
+1. RCU (Read capacity unit):
+   1. 1 strongly consistent read of 4KB per second
+   2. 2 eventually consistent read of 4KB per second
+2. WCU:
+   1. 1 write of 1KB per second
+
+Throughput can be exceeded temporarily using **burst credit**.
+
+#### DAX (DynamoDB Accelerator)
+
+1. Cache for DynamoDB. Micro second latency for cached reads & queries.
+2. Default TTL 5 min
+3. Solves hot key problem
+
+#### DynamoDB Streams
+
+Changes in DynamoDB can end up in a DynamoDB Stream, which can be consumed by AWS Lambda, etc. 
+
+Streams have a 24 hour retention.
+
+#### Security and other features
+
+Security:
+
+1. VPC endpoint available
+2. KMS for at-rest, SSL/TLS for in-transit
+3. IAM to manage access
+
+Backup & Restore
+
+1. Point in time
+2. No performance impact
+
+Global table: multiple regions, fully replicated with high performance
+
+1. Active replications
+2. **Must enable DynamoDB Streams**
+
+Local development available.
+
+DMS can be used to migrate to DynamoDB.
+
+### AWS API Gateway
+
+#### Overview
+
+1. Support websocket protocol 
+2. Handle API versioning
+3. Handle different environment 
+4. Handle security 
+5. Create API keys that handle request throttling
+6. Swagger/Open API importing
+7. Generate SDK and API specifications
+8. Transform and validate API responses
+9. Cache API responses
+
+#### Integration
+
+1. Lambda functions
+2. HTTP endpoint
+3. AWS Services
+
+Classification by endpoint spatial type
+
+1. edge-optimized (default)
+   1. through cloud front edge location 
+2. regional
+   1. for clients within the same region
+3. private 
+   1. only be accessed from your VPC using ENI
+   2. can use resource policy to define access
+
+#### Security 
+
+##### IAM permissions
+
+1. Create IAM policy authentication and authorization and attach to user/roles. 
+2. Leverage "Sig v4" capacity where IAM credentials are in the headers.
+
+##### Lambda Authorizer
+
+1. Use AWS Lambda to validate the token in header. 
+2. Both authentication and authorization
+3. Helps to use Oauth SAML and 3rd party type of authentication.
+4. Lambda must return an IAM policy for the user, very **flexible**
+
+
+##### Cognito User Pools
+
+1. Cognito fully manges user life-cylce
+2. API gateway verifies identity automatically from AWS Cognito
+3. Only **authentication**, not **authorization**, which requires customized code.
+
+### AWS Cognito
+
 
 ## Network
 
